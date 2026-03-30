@@ -1,0 +1,29 @@
+{
+  "name": "bitbucket-data-center-mcp",
+  "version": "0.0.0",
+  "description": "Model Context Protocol (MCP) server for Bitbucket Data Center",
+  "author": "Peter Knezek @peterknezek",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/peterknezek/bitbucket-data-center-mcp"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "test": "vitest",
+    "typecheck": "tsc",
+    "inspect": "mcp-inspector"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.25.67"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "@modelcontextprotocol/inspector": "^0.21.1",
+    "@types/node": "^24.6.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
