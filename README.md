@@ -7,6 +7,14 @@ A Model Context Protocol (MCP) server for Bitbucket Data Center, designed to imp
 - [Node.js](https://nodejs.org/) v18 or higher
 - [pnpm](https://pnpm.io/) v8 or higher
 
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BITBUCKET_URL` | Yes | Base URL of your Bitbucket Data Center instance (e.g. `https://bitbucket.example.com`) |
+| `BITBUCKET_TOKEN` | Yes | Personal access token for authentication |
+| `DEBUG` | No | Set to any value to enable debug logging |
+
 ## Installation
 
 ```bash
@@ -15,11 +23,17 @@ cd bitbucket-data-center-mcp
 pnpm install
 ```
 
+## Available Tools
+
+| Name | Description |
+|------|-------------|
+| `get_pr_comments` | Fetches all unresolved inline review comments for the open PR on the current branch. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor. |
+
 ## Available Prompts
 
 | Name | Description |
 |------|-------------|
-| `to_markdown` | Convert the provided text to Markdown format |
+| `review-pr-comments` | Fetches and displays all unresolved PR review comments as formatted, navigable links |
 
 ## Connecting to an MCP Client
 
@@ -34,7 +48,11 @@ pnpm install
   "mcpServers": {
     "bitbucket-data-center-mcp": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "/path/to/bitbucket-data-center-mcp", "run", "dev"]
+      "args": ["--silent", "--prefix", "/path/to/bitbucket-data-center-mcp", "run", "dev"],
+      "env": {
+        "BITBUCKET_URL": "https://bitbucket.example.com",
+        "BITBUCKET_TOKEN": "your-personal-access-token"
+      }
     }
   }
 }
@@ -54,7 +72,11 @@ pnpm install
   "mcpServers": {
     "bitbucket-data-center-mcp": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "/path/to/bitbucket-data-center-mcp", "run", "dev"]
+      "args": ["--silent", "--prefix", "/path/to/bitbucket-data-center-mcp", "run", "dev"],
+      "env": {
+        "BITBUCKET_URL": "https://bitbucket.example.com",
+        "BITBUCKET_TOKEN": "your-personal-access-token"
+      }
     }
   }
 }
@@ -101,4 +123,4 @@ Click **Connect**. The inspector spawns the server process and proxies the MCP p
 npx @modelcontextprotocol/inspector tsx src/index.ts
 ```
 
-**Environment variables:** If your server requires Bitbucket credentials, set them in the **Environment Variables** section of the inspector UI before clicking Connect.
+**Environment variables:** Set `BITBUCKET_URL` and `BITBUCKET_TOKEN` in the **Environment Variables** section of the inspector UI before clicking Connect.
