@@ -52,6 +52,65 @@ interface Activity {
   };
 }
 
+interface BranchRef {
+  displayId: string;
+}
+
+export async function getDefaultBranch(
+  client: BitbucketClient,
+  project: string,
+  repo: string,
+): Promise<string> {
+  const branch = await client.get<BranchRef>(
+    `/rest/api/1.0/projects/${project}/repos/${repo}/branches/default`,
+  );
+  return branch.displayId;
+}
+
+interface CreatePrPayload {
+  title: string;
+  description?: string;
+  state: "OPEN";
+  draft: boolean;
+  fromRef: { id: string; repository: { slug: string; project: { key: string } } };
+  toRef: { id: string; repository: { slug: string; project: { key: string } } };
+  reviewers: Array<{ user: { name: string } }>;
+}
+
+export interface CreatedPr {
+  id: number;
+  links: { self: Array<{ href: string }> };
+}
+
+export async function createPr(
+  client: BitbucketClient,
+  project: string,
+  repo: string,
+  options: {
+    title: string;
+    description?: string;
+    fromBranch: string;
+    toBranch: string;
+    reviewers?: string[];
+    draft?: boolean;
+  },
+): Promise<CreatedPr> {
+  const refRepo = { slug: repo, project: { key: project } };
+  const payload: CreatePrPayload = {
+    title: options.title,
+    description: options.description,
+    state: "OPEN",
+    draft: options.draft ?? false,
+    fromRef: { id: `refs/heads/${options.fromBranch}`, repository: refRepo },
+    toRef: { id: `refs/heads/${options.toBranch}`, repository: refRepo },
+    reviewers: (options.reviewers ?? []).map((name) => ({ user: { name } })),
+  };
+  return client.post<CreatedPr>(
+    `/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests`,
+    payload,
+  );
+}
+
 export async function getPrComments(
   client: BitbucketClient,
   project: string,

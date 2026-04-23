@@ -26,7 +26,7 @@ const server = new McpServer(
   },
   {
     instructions:
-      "This MCP provides read-only access to Bitbucket Data Center pull request review comments.",
+      "This MCP provides access to Bitbucket Data Center pull request operations, including fetching review comments and creating pull requests.",
   },
 );
 
