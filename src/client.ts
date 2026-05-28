@@ -30,6 +30,27 @@ export class BitbucketClient {
     return res.json() as Promise<T>;
   }
 
+  async post<T = unknown>(path: string, body: unknown): Promise<T> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const res = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      let errBody = "";
+      try { errBody = await res.text(); } catch { /* ignore */ }
+      throw new Error(
+        `Bitbucket API error: HTTP ${res.status} for POST ${url.toString()}${errBody ? ` — ${errBody}` : ""}`,
+      );
+    }
+    return res.json() as Promise<T>;
+  }
+
   async paginate<T = unknown>(
     path: string,
     params?: Record<string, string>,

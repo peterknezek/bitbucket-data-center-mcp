@@ -28,12 +28,14 @@ pnpm install
 | Name | Description |
 |------|-------------|
 | `get_pr_comments` | Fetches all unresolved inline review comments for the open PR on the current branch. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor. |
+| `create_pull_request` | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers and draft status. |
 
 ## Available Prompts
 
 | Name | Description |
 |------|-------------|
 | `review-pr-comments` | Fetches and displays all unresolved PR review comments as formatted, navigable links |
+| `create-pull-request` | Analyzes the current branch, drafts a PR title and short description following branch naming conventions, confirms with the user, then creates the pull request on Bitbucket Data Center. |
 
 ## Connecting to an MCP Client
 

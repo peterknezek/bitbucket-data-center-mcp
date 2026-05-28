@@ -22,11 +22,11 @@ const server = new McpServer(
   {
     name: "bitbucket-data-center-mcp",
     title: "Bitbucket Data Center MCP",
-    version: "0.0.1",
+    version: "0.1.0",
   },
   {
     instructions:
-      "This MCP provides read-only access to Bitbucket Data Center pull request review comments.",
+      "This MCP provides access to Bitbucket Data Center pull request operations, including fetching review comments and creating pull requests.",
   },
 );
 
