@@ -1,16 +1,23 @@
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
 import { type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { type BitbucketClient } from "./client.js";
-import { findOpenPrForBranch, getPrComments, getDefaultBranch, createPr, type CommentResult } from "./resources.js";
+import {
+  findOpenPrForBranch,
+  getPrComments,
+  getDefaultBranch,
+  createPr,
+  replyToPrComment,
+  type CommentResult,
+} from "./resources.js";
 
 function formatComments(comments: CommentResult[], repoPath: string | undefined): string {
   if (comments.length === 0) {
     return "No unresolved inline PR comments found.";
   }
 
-  return comments
-    .map((c, i) => {
+  const formatted = comments
+    .map((c) => {
       const location = c.line != null ? `${c.file}:${c.line}` : c.file;
       const link =
         repoPath != null && c.line != null
@@ -18,9 +25,18 @@ function formatComments(comments: CommentResult[], repoPath: string | undefined)
           : `\`@${location}\``;
       const severity = c.severity !== "NORMAL" ? ` · **${c.severity}**` : "";
       const commentText = c.text.split("\n").join("\n> ");
-      return `${link}${severity}\n> ${commentText}`;
+      return `[ID: ${c.id}] ${link}${severity}\n> ${commentText}`;
     })
     .join("\n\n");
+
+  const ids = comments.map((c) => c.id).join(", ");
+  const suggestion =
+    `\n\n---\n` +
+    `To reply to a comment, use the \`reply_to_pr_comment\` tool with the comment ID and your reply text.\n` +
+    `Example: reply to comment ${comments[0].id} — "Fixed by updating the validation logic in X."\n` +
+    `\nAvailable comment IDs: ${ids}`;
+
+  return formatted + suggestion;
 }
 
 function git(cmd: string, cwd: string): string {
@@ -141,7 +157,7 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           .optional()
           .describe(
             "Absolute path to the local repository root (from `git rev-parse --show-toplevel`). " +
-            "Auto-detects project, repo, and branch via git.",
+              "Auto-detects project, repo, and branch via git.",
           ),
         project: z
           .string()
@@ -151,38 +167,24 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           .string()
           .optional()
           .describe("Bitbucket repository slug. Inferred from git remote when repoPath is provided."),
-        branch: z
-          .string()
-          .optional()
-          .describe("Source branch (fromRef). Inferred from git when repoPath is provided."),
+        branch: z.string().optional().describe("Source branch (fromRef). Inferred from git when repoPath is provided."),
         title: z
           .string()
           .optional()
-          .describe(
-            "PR title. If omitted, auto-generated from branch name as <type>(<taskId>): <description>.",
-          ),
+          .describe("PR title. If omitted, auto-generated from branch name as <type>(<taskId>): <description>."),
         taskId: z
           .string()
           .optional()
           .describe(
             "Jira task ID (e.g. CDC-123). Required when branch name does not follow the convention and title is not provided.",
           ),
-        description: z
-          .string()
-          .optional()
-          .describe("Short bullet-point description of what changed."),
+        description: z.string().optional().describe("Short bullet-point description of what changed."),
         targetBranch: z
           .string()
           .optional()
           .describe("Target branch (toRef). Defaults to the repository's default branch."),
-        reviewers: z
-          .array(z.string())
-          .optional()
-          .describe("List of Bitbucket usernames to add as reviewers."),
-        draft: z
-          .boolean()
-          .optional()
-          .describe("Create as a draft pull request. Defaults to false."),
+        reviewers: z.array(z.string()).optional().describe("List of Bitbucket usernames to add as reviewers."),
+        draft: z.boolean().optional().describe("Create as a draft pull request. Defaults to false."),
       }),
     },
     async ({ repoPath, project, repo, branch, title, taskId, description, targetBranch, reviewers, draft }) => {
@@ -211,29 +213,29 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         const remoteRef = git(`git ls-remote --heads origin refs/heads/${resolvedBranch}`, repoPath);
         if (!remoteRef) {
           return {
-            content: [{
-              type: "text",
-              text: [
-                `Branch "${resolvedBranch}" has not been pushed to origin yet.`,
-                `Bitbucket cannot create a PR from a branch that doesn't exist on the remote.`,
-                ``,
-                `Push it first with:`,
-                ``,
-                `  git push -u origin ${resolvedBranch}`,
-                ``,
-                `Then retry creating the pull request.`,
-              ].join("\n"),
-            }],
+            content: [
+              {
+                type: "text",
+                text: [
+                  `Branch "${resolvedBranch}" has not been pushed to origin yet.`,
+                  `Bitbucket cannot create a PR from a branch that doesn't exist on the remote.`,
+                  ``,
+                  `Push it first with:`,
+                  ``,
+                  `  git push -u origin ${resolvedBranch}`,
+                  ``,
+                  `Then retry creating the pull request.`,
+                ].join("\n"),
+              },
+            ],
           };
         }
       }
 
-      const resolvedTarget = targetBranch ?? await getDefaultBranch(client, resolvedProject, resolvedRepo);
+      const resolvedTarget = targetBranch ?? (await getDefaultBranch(client, resolvedProject, resolvedRepo));
 
       if (resolvedBranch === resolvedTarget) {
-        throw new Error(
-          `Source branch "${resolvedBranch}" and target branch "${resolvedTarget}" are the same.`,
-        );
+        throw new Error(`Source branch "${resolvedBranch}" and target branch "${resolvedTarget}" are the same.`);
       }
 
       let resolvedTitle = title;
@@ -246,7 +248,7 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         } else {
           throw new Error(
             `Branch "${resolvedBranch}" does not follow convention (<type>/<taskId>_<desc>). ` +
-            "Provide taskId or title explicitly.",
+              "Provide taskId or title explicitly.",
           );
         }
       }
@@ -272,6 +274,72 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
       lines.push(``, prUrl);
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
+    },
+  );
+
+  server.registerTool(
+    "reply_to_pr_comment",
+    {
+      title: "Reply to PR Comment",
+      description:
+        "Posts a reply to a specific pull request comment by its ID. " +
+        "Use the comment IDs returned by get_pr_comments. " +
+        "Useful for a developer acknowledging a review comment, or for an LLM explaining what fix was applied. " +
+        "Pass repoPath (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.",
+      inputSchema: z.object({
+        commentId: z.number().describe("ID of the comment to reply to (from get_pr_comments)."),
+        text: z.string().describe("The reply text to post."),
+        repoPath: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to the local repository root (from `git rev-parse --show-toplevel`). " +
+              "Auto-detects project, repo, and branch via git.",
+          ),
+        project: z
+          .string()
+          .optional()
+          .describe("Bitbucket project key. Inferred from git remote when repoPath is provided."),
+        repo: z
+          .string()
+          .optional()
+          .describe("Bitbucket repository slug. Inferred from git remote when repoPath is provided."),
+        branch: z.string().optional().describe("Source branch. Inferred from git when repoPath is provided."),
+      }),
+    },
+    async ({ commentId, text, repoPath, project, repo, branch }) => {
+      let resolvedProject = project;
+      let resolvedRepo = repo;
+      let resolvedBranch = branch;
+
+      if (repoPath && (!resolvedProject || !resolvedRepo || !resolvedBranch)) {
+        const remoteUrl = git("git remote get-url origin", repoPath);
+        const parsed = parseRemoteUrl(remoteUrl);
+        if (!parsed) {
+          throw new Error(`Could not parse git remote URL: ${remoteUrl}`);
+        }
+        resolvedProject = resolvedProject ?? parsed.project;
+        resolvedRepo = resolvedRepo ?? parsed.repo;
+        resolvedBranch = resolvedBranch ?? git("git branch --show-current", repoPath);
+      }
+
+      if (!resolvedProject || !resolvedRepo || !resolvedBranch) {
+        throw new Error(
+          "Provide repoPath (from `git rev-parse --show-toplevel`) or pass project, repo, and branch explicitly.",
+        );
+      }
+
+      const prId = await findOpenPrForBranch(client, resolvedProject, resolvedRepo, resolvedBranch);
+      const reply = await replyToPrComment(client, resolvedProject, resolvedRepo, prId, commentId, text);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: [`Reply posted successfully.`, `Comment ID: ${commentId}`, `Reply ID: ${reply.id}`].join("\n"),
+          },
+        ],
+      };
     },
   );
 }

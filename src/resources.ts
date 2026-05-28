@@ -12,17 +12,14 @@ export async function findOpenPrForBranch(
   repo: string,
   branch: string,
 ): Promise<number> {
-  const prs = await client.paginate<PullRequest>(
-    `/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests`,
-    { state: "OPEN" },
-  );
+  const prs = await client.paginate<PullRequest>(`/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests`, {
+    state: "OPEN",
+  });
 
   const pr = prs.find((p) => !p.draft && p.fromRef.displayId === branch);
 
   if (!pr) {
-    throw new Error(
-      `No open pull request found for branch "${branch}" in ${project}/${repo}`,
-    );
+    throw new Error(`No open pull request found for branch "${branch}" in ${project}/${repo}`);
   }
 
   return pr.id;
@@ -56,14 +53,8 @@ interface BranchRef {
   displayId: string;
 }
 
-export async function getDefaultBranch(
-  client: BitbucketClient,
-  project: string,
-  repo: string,
-): Promise<string> {
-  const branch = await client.get<BranchRef>(
-    `/rest/api/1.0/projects/${project}/repos/${repo}/branches/default`,
-  );
+export async function getDefaultBranch(client: BitbucketClient, project: string, repo: string): Promise<string> {
+  const branch = await client.get<BranchRef>(`/rest/api/1.0/projects/${project}/repos/${repo}/branches/default`);
   return branch.displayId;
 }
 
@@ -105,10 +96,26 @@ export async function createPr(
     toRef: { id: `refs/heads/${options.toBranch}`, repository: refRepo },
     reviewers: (options.reviewers ?? []).map((name) => ({ user: { name } })),
   };
-  return client.post<CreatedPr>(
-    `/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests`,
-    payload,
-  );
+  return client.post<CreatedPr>(`/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests`, payload);
+}
+
+export interface CommentReply {
+  id: number;
+  text: string;
+}
+
+export async function replyToPrComment(
+  client: BitbucketClient,
+  project: string,
+  repo: string,
+  prId: number,
+  commentId: number,
+  text: string,
+): Promise<CommentReply> {
+  return client.post<CommentReply>(`/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests/${prId}/comments`, {
+    text,
+    parent: { id: commentId },
+  });
 }
 
 export async function getPrComments(

@@ -9,11 +9,11 @@ A Model Context Protocol (MCP) server for Bitbucket Data Center, designed to imp
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `BITBUCKET_URL` | Yes | Base URL of your Bitbucket Data Center instance (e.g. `https://bitbucket.example.com`) |
-| `BITBUCKET_TOKEN` | Yes | Personal access token for authentication |
-| `DEBUG` | No | Set to any value to enable debug logging |
+| Variable          | Required | Description                                                                            |
+| ----------------- | -------- | -------------------------------------------------------------------------------------- |
+| `BITBUCKET_URL`   | Yes      | Base URL of your Bitbucket Data Center instance (e.g. `https://bitbucket.example.com`) |
+| `BITBUCKET_TOKEN` | Yes      | Personal access token for authentication                                               |
+| `DEBUG`           | No       | Set to any value to enable debug logging                                               |
 
 ## Installation
 
@@ -25,18 +25,19 @@ pnpm install
 
 ## Available Tools
 
-| Name | Description |
-|------|-------------|
-| `get_pr_comments` | Fetches all unresolved inline review comments for the open PR on the current branch. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor. |
+| Name                  | Description                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_pr_comments`     | Fetches all unresolved inline review comments for the open PR on the current branch. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor.                                                                                            |
 | `create_pull_request` | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers and draft status. |
+| `reply_to_pr_comment` | Posts a reply to a specific pull request comment by its ID. Use the comment IDs returned by `get_pr_comments`. Useful for acknowledging a review comment or explaining what fix was applied. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.                                      |
 
 ## Available Prompts
 
-| Name | Description |
-|------|-------------|
-| `review-pr-comments` | Fetches and displays all unresolved PR review comments as formatted, navigable links |
+| Name                  | Description                                                                                                                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review-pr-comments`  | Fetches and displays all unresolved PR review comments as formatted, navigable links                                                                                                      |
 | `create-pull-request` | Analyzes the current branch, drafts a PR title and short description following branch naming conventions, confirms with the user, then creates the pull request on Bitbucket Data Center. |
-| `rebase-onto-main` | Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes. |
+| `rebase-onto-main`    | Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes.                                    |
 
 ## Connecting to an MCP Client
 
@@ -91,12 +92,12 @@ pnpm install
 
 ### Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Run the MCP server |
-| `pnpm test` | Run tests |
-| `pnpm typecheck` | Type-check the project |
-| `pnpm inspect` | Launch MCP Inspector UI |
+| Command          | Description             |
+| ---------------- | ----------------------- |
+| `pnpm dev`       | Run the MCP server      |
+| `pnpm test`      | Run tests               |
+| `pnpm typecheck` | Type-check the project  |
+| `pnpm inspect`   | Launch MCP Inspector UI |
 
 ### Debugging with MCP Inspector
 
@@ -112,10 +113,10 @@ The UI opens at **http://localhost:6274**.
 
 **Connect to the server in the UI:**
 
-| Field | Value |
-|-------|-------|
-| Transport | `STDIO` |
-| Command | `tsx` |
+| Field     | Value          |
+| --------- | -------------- |
+| Transport | `STDIO`        |
+| Command   | `tsx`          |
 | Arguments | `src/index.ts` |
 
 Click **Connect**. The inspector spawns the server process and proxies the MCP protocol.

@@ -4,10 +4,7 @@ export class BitbucketClient {
     private readonly token: string,
   ) {}
 
-  async get<T = unknown>(
-    path: string,
-    params?: Record<string, string>,
-  ): Promise<T> {
+  async get<T = unknown>(path: string, params?: Record<string, string>): Promise<T> {
     const url = new URL(`${this.baseUrl}${path}`);
     if (params) {
       for (const [key, value] of Object.entries(params)) {
@@ -22,10 +19,12 @@ export class BitbucketClient {
     });
     if (!res.ok) {
       let body = "";
-      try { body = await res.text(); } catch { /* ignore */ }
-      throw new Error(
-        `Bitbucket API error: HTTP ${res.status} for ${url.toString()}${body ? ` — ${body}` : ""}`,
-      );
+      try {
+        body = await res.text();
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`Bitbucket API error: HTTP ${res.status} for ${url.toString()}${body ? ` — ${body}` : ""}`);
     }
     return res.json() as Promise<T>;
   }
@@ -43,7 +42,11 @@ export class BitbucketClient {
     });
     if (!res.ok) {
       let errBody = "";
-      try { errBody = await res.text(); } catch { /* ignore */ }
+      try {
+        errBody = await res.text();
+      } catch {
+        /* ignore */
+      }
       throw new Error(
         `Bitbucket API error: HTTP ${res.status} for POST ${url.toString()}${errBody ? ` — ${errBody}` : ""}`,
       );
@@ -51,10 +54,7 @@ export class BitbucketClient {
     return res.json() as Promise<T>;
   }
 
-  async paginate<T = unknown>(
-    path: string,
-    params?: Record<string, string>,
-  ): Promise<T[]> {
+  async paginate<T = unknown>(path: string, params?: Record<string, string>): Promise<T[]> {
     const results: T[] = [];
     let start = 0;
     const limit = 100;

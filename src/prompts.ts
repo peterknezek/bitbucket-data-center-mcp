@@ -5,8 +5,7 @@ export function registerPrompts(server: McpServer) {
     "review-pr-comments",
     {
       title: "Review PR Comments",
-      description:
-        "Fetches and displays all unresolved PR review comments as formatted, navigable links.",
+      description: "Fetches and displays all unresolved PR review comments as formatted, navigable links.",
     },
     async () => ({
       messages: [
