@@ -29,6 +29,26 @@ Follow these steps exactly:
   );
 
   server.registerPrompt(
+    "rebase-onto-main",
+    {
+      title: "Rebase onto Main",
+      description:
+        "Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes.",
+    },
+    async () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: "Detect whether the default branch in this repo is called `main` or `master`, then rebase the current branch onto it, resolve any conflicts, and force-push.",
+          },
+        },
+      ],
+    }),
+  );
+
+  server.registerPrompt(
     "create-pull-request",
     {
       title: "Create Pull Request",

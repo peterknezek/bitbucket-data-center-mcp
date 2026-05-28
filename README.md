@@ -36,6 +36,7 @@ pnpm install
 |------|-------------|
 | `review-pr-comments` | Fetches and displays all unresolved PR review comments as formatted, navigable links |
 | `create-pull-request` | Analyzes the current branch, drafts a PR title and short description following branch naming conventions, confirms with the user, then creates the pull request on Bitbucket Data Center. |
+| `rebase-onto-main` | Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes. |
 
 ## Connecting to an MCP Client
 
