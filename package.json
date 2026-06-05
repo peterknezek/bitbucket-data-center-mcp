@@ -1,6 +1,6 @@
 {
   "name": "bitbucket-data-center-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Model Context Protocol (MCP) server for Bitbucket Data Center",
   "author": "Peter Knezek @peterknezek",
   "private": true,

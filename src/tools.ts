@@ -9,7 +9,19 @@ import {
   createPr,
   replyToPrComment,
   type CommentResult,
+  type ReplyResult,
 } from "./resources.js";
+
+function formatReplies(replies: ReplyResult[], depth: number): string {
+  return replies
+    .map((r) => {
+      const indent = "  ".repeat(depth);
+      const replyText = r.text.split("\n").join(`\n${indent}> `);
+      const nested = formatReplies(r.replies, depth + 1);
+      return `${indent}↳ [ID: ${r.id}]\n${indent}> ${replyText}${nested ? "\n\n" + nested : ""}`;
+    })
+    .join("\n\n");
+}
 
 function formatComments(comments: CommentResult[], repoPath: string | undefined): string {
   if (comments.length === 0) {
@@ -25,7 +37,8 @@ function formatComments(comments: CommentResult[], repoPath: string | undefined)
           : `\`@${location}\``;
       const severity = c.severity !== "NORMAL" ? ` · **${c.severity}**` : "";
       const commentText = c.text.split("\n").join("\n> ");
-      return `[ID: ${c.id}] ${link}${severity}\n> ${commentText}`;
+      const thread = c.replies.length ? "\n\n" + formatReplies(c.replies, 1) : "";
+      return `[ID: ${c.id}] ${link}${severity}\n> ${commentText}${thread}`;
     })
     .join("\n\n");
 

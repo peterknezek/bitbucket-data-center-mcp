@@ -25,6 +25,12 @@ export async function findOpenPrForBranch(
   return pr.id;
 }
 
+export interface ReplyResult {
+  id: number;
+  text: string;
+  replies: ReplyResult[];
+}
+
 export interface CommentResult {
   id: number;
   file: string;
@@ -32,21 +38,25 @@ export interface CommentResult {
   lineType: string | null;
   severity: string;
   text: string;
+  replies: ReplyResult[];
+}
+
+interface Comment {
+  id: number;
+  text: string;
+  severity?: string;
+  threadResolved?: boolean;
+  anchor?: {
+    path?: string;
+    line?: number;
+    lineType?: string;
+  };
+  comments?: Comment[];
 }
 
 interface Activity {
   action: string;
-  comment?: {
-    id: number;
-    text: string;
-    severity?: string;
-    threadResolved?: boolean;
-    anchor?: {
-      path?: string;
-      line?: number;
-      lineType?: string;
-    };
-  };
+  comment?: Comment;
 }
 
 interface BranchRef {
@@ -118,6 +128,11 @@ export async function replyToPrComment(
   });
 }
 
+function mapReplies(comments: Comment[] | undefined): ReplyResult[] {
+  if (!comments?.length) return [];
+  return comments.map((c) => ({ id: c.id, text: c.text, replies: mapReplies(c.comments) }));
+}
+
 export async function getPrComments(
   client: BitbucketClient,
   project: string,
@@ -147,6 +162,7 @@ export async function getPrComments(
       lineType: c.anchor!.lineType ?? null,
       severity: c.severity ?? "NORMAL",
       text: c.text,
+      replies: mapReplies(c.comments),
     };
   });
 }
