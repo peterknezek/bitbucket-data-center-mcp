@@ -25,21 +25,51 @@ pnpm install
 
 ## Available Tools
 
-| Name                  | Description                                                                                                                                                                                                                                                                                                                        |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_pr_comments`     | Fetches all unresolved inline review comments for the open PR on the current branch, including full reply threads rendered as nested trees. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor.                                      |
-| `create_pull_request` | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers, draft status, and screenshots (`attachments`). |
-| `reply_to_pr_comment` | Posts a reply to a specific pull request comment by its ID. Use the comment IDs returned by `get_pr_comments`. Useful for acknowledging a review comment or explaining what fix was applied. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.                                      |
-| `update_pull_request` | Replaces the description (and optionally the title) of an open pull request, typically after new commits were pushed. Saves immediately; reviewers, target branch and draft status are left unchanged, and the previous description is returned. Pass `repoPath` to auto-detect project, repo, and branch. Pass `attachments` to add screenshots. |
+| Name                   | Description                                                                                                                                                                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_pr_comments`      | Fetches all unresolved inline review comments for the open PR on the current branch, including full reply threads rendered as nested trees. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor.                                     |
+| `create_pull_request`  | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers, draft status, and screenshots (`attachments`). |
+| `get_pr_review_status` | Checks whether a pull request has been reviewed and, if so, whether it was approved. The status is derived from reviewer statuses in the Bitbucket API, without LLM analysis. Pass `prId`, or `repoPath` to use the open PR for the current branch. See [PR review status](#pr-review-status).                                     |
+| `reply_to_pr_comment`  | Posts a reply to a specific pull request comment by its ID. Use the comment IDs returned by `get_pr_comments`. Useful for acknowledging a review comment or explaining what fix was applied. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.                                      |
+| `update_pull_request`  | Replaces the description (and optionally the title) of an open pull request, typically after new commits were pushed. Saves immediately; reviewers, target branch and draft status are left unchanged, and the previous description is returned. Pass `repoPath` to auto-detect project, repo, and branch. Pass `attachments` to add screenshots. |
+
+### PR review status
+
+`get_pr_review_status` reads the reviewers of a pull request and returns one of the following statuses:
+
+| Status         | Meaning                                                                        | Reviewed | Approved |
+| -------------- | ------------------------------------------------------------------------------ | -------- | -------- |
+| `APPROVED`     | At least one reviewer approved and nobody marked the PR as **Needs work**      | yes      | yes      |
+| `NEEDS_WORK`   | At least one reviewer marked the PR as **Needs work**, even if others approved | yes      | no       |
+| `NOT_REVIEWED` | Reviewers are assigned, but none has approved or requested changes yet         | no       | no       |
+| `NO_REVIEWERS` | No reviewers are assigned to the PR                                            | no       | no       |
+
+Example response:
+
+```text
+PR #42: feat(CDC-123): add login flow
+State: OPEN
+Review status: APPROVED
+Reviewed: yes
+Approved: yes
+
+Reviewed and approved — 1 of 2 reviewer(s) approved.
+
+Reviewers:
+- Jane Doe (jdoe): APPROVED
+- John Smith (jsmith): UNAPPROVED
+```
+
+Merge checks configured in Bitbucket (for example, a minimum number of approvals) are not evaluated, so `APPROVED` does not guarantee the PR can be merged. When `prId` is omitted, the tool looks up the open, non-draft PR for the current branch.
 
 ## Available Prompts
 
-| Name                  | Description                                                                                                                                                                               |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `review-pr-comments`  | Fetches and displays all unresolved PR review comments as formatted, navigable links                                                                                                      |
-| `create-pull-request` | Analyzes the current branch, drafts a PR title and short description following branch naming conventions, confirms with the user, then creates the pull request on Bitbucket Data Center. |
-| `rebase-onto-main`    | Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes.                                    |
-| `update-pr-description` | After new commits were pushed, rewrites the PR description to match the branch's current changes, confirms the draft with the user, then saves it.                                       |
+| Name                    | Description                                                                                                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `review-pr-comments`    | Fetches and displays all unresolved PR review comments as formatted, navigable links                                                                                                      |
+| `create-pull-request`   | Analyzes the current branch, drafts a PR title and short description following branch naming conventions, confirms with the user, then creates the pull request on Bitbucket Data Center. |
+| `rebase-onto-main`      | Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes.                                    |
+| `update-pr-description` | After new commits were pushed, rewrites the PR description to match the branch's current changes, confirms the draft with the user, then saves it.                                        |
 
 ## Connecting to an MCP Client
 
@@ -54,7 +84,13 @@ pnpm install
   "mcpServers": {
     "bitbucket-data-center-mcp": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "/path/to/bitbucket-data-center-mcp", "run", "dev"],
+      "args": [
+        "--silent",
+        "--prefix",
+        "/path/to/bitbucket-data-center-mcp",
+        "run",
+        "dev"
+      ],
       "env": {
         "BITBUCKET_URL": "https://bitbucket.example.com",
         "BITBUCKET_TOKEN": "your-personal-access-token"
@@ -78,7 +114,13 @@ pnpm install
   "mcpServers": {
     "bitbucket-data-center-mcp": {
       "command": "npm",
-      "args": ["--silent", "--prefix", "/path/to/bitbucket-data-center-mcp", "run", "dev"],
+      "args": [
+        "--silent",
+        "--prefix",
+        "/path/to/bitbucket-data-center-mcp",
+        "run",
+        "dev"
+      ],
       "env": {
         "BITBUCKET_URL": "https://bitbucket.example.com",
         "BITBUCKET_TOKEN": "your-personal-access-token"
