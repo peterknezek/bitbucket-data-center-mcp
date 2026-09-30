@@ -10,7 +10,7 @@
     "url": "git+https://github.com/peterknezek/bitbucket-data-center-mcp"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "dev": "tsx src/index.ts",
@@ -19,14 +19,14 @@
     "inspect": "mcp-inspector"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "zod": "^3.25.67"
+    "@modelcontextprotocol/sdk": "^1.31.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "tsx": "^4.21.0",
-    "@modelcontextprotocol/inspector": "^0.21.1",
-    "@types/node": "^24.6.0",
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4"
+    "@modelcontextprotocol/inspector": "^2.8.0",
+    "@types/node": "^26.6.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
   }
 }

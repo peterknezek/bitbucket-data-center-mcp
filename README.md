@@ -4,8 +4,8 @@ A Model Context Protocol (MCP) server for Bitbucket Data Center, designed to imp
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) v18 or higher
-- [pnpm](https://pnpm.io/) v8 or higher
+- [Node.js](https://nodejs.org/) v22.19 or higher (v24 LTS recommended)
+- [pnpm](https://pnpm.io/) v9 or higher
 
 ## Environment Variables
 
@@ -101,30 +101,24 @@ pnpm install
 
 ### Debugging with MCP Inspector
 
-The project includes [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) as a dev dependency. Use it to interactively test tools, resources, and prompts exposed by the server.
+The project includes [`@modelcontextprotocol/inspector`](https://github.com/modelcontextprotocol/inspector) (v2) as a dev dependency. Use it to interactively test tools, resources, and prompts exposed by the server.
 
-**Start the inspector:**
-
-```bash
-pnpm inspect
-```
-
-The UI opens at **http://localhost:6274**.
-
-**Connect to the server in the UI:**
-
-| Field     | Value          |
-| --------- | -------------- |
-| Transport | `STDIO`        |
-| Command   | `tsx`          |
-| Arguments | `src/index.ts` |
-
-Click **Connect**. The inspector spawns the server process and proxies the MCP protocol.
-
-**Alternatively, pass the command directly on the CLI:**
+**Start the inspector with the server preconfigured:**
 
 ```bash
-npx @modelcontextprotocol/inspector tsx src/index.ts
+pnpm exec mcp-inspector -e BITBUCKET_URL=https://bitbucket.example.com -e BITBUCKET_TOKEN=your-personal-access-token tsx src/index.ts
 ```
 
-**Environment variables:** Set `BITBUCKET_URL` and `BITBUCKET_TOKEN` in the **Environment Variables** section of the inspector UI before clicking Connect.
+The terminal prints a URL like `http://127.0.0.1:6274?MCP_INSPECTOR_API_TOKEN=…`. Open that exact URL (it includes the session auth token), then toggle the `tsx` server card to **Connected**. The inspector spawns the server process and proxies the MCP protocol.
+
+**Environment variables:** The spawned server does not inherit your shell environment. Pass `BITBUCKET_URL` and `BITBUCKET_TOKEN` with `-e KEY=VALUE` as shown above.
+
+`pnpm inspect` starts the inspector with an empty server list. You can add the server there via **Add Servers → Add manually**.
+
+**Scripted checks with the inspector CLI:**
+
+```bash
+pnpm exec mcp-inspector --cli tsx src/index.ts -e BITBUCKET_URL=https://bitbucket.example.com -e BITBUCKET_TOKEN=your-personal-access-token --method tools/list
+```
+
+Mode flags (`--web`, `--cli`, `--tui`) must come first. In `--cli` mode, put the server command before the options.
