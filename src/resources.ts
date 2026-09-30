@@ -166,3 +166,90 @@ export async function getPrComments(
     };
   });
 }
+
+export type ReviewerStatus = "APPROVED" | "NEEDS_WORK" | "UNAPPROVED";
+
+interface PullRequestParticipant {
+  user: { name: string; displayName?: string };
+  role: "AUTHOR" | "REVIEWER" | "PARTICIPANT";
+  approved: boolean;
+  status: ReviewerStatus;
+}
+
+interface PullRequestDetails {
+  id: number;
+  title: string;
+  state: "OPEN" | "MERGED" | "DECLINED";
+  draft?: boolean;
+  reviewers: PullRequestParticipant[];
+  links?: { self?: Array<{ href: string }> };
+}
+
+export interface ReviewerResult {
+  name: string;
+  displayName: string;
+  status: ReviewerStatus;
+}
+
+export type OverallReviewStatus = "NO_REVIEWERS" | "NOT_REVIEWED" | "NEEDS_WORK" | "APPROVED";
+
+export interface ReviewStatusResult {
+  prId: number;
+  title: string;
+  state: string;
+  draft: boolean;
+  url: string | null;
+  status: OverallReviewStatus;
+  reviewed: boolean;
+  approved: boolean;
+  approvals: number;
+  reviewers: ReviewerResult[];
+}
+
+export function summarizeReviewStatus(reviewers: ReviewerResult[]): {
+  status: OverallReviewStatus;
+  reviewed: boolean;
+  approved: boolean;
+  approvals: number;
+} {
+  const approvals = reviewers.filter((r) => r.status === "APPROVED").length;
+  const needsWork = reviewers.some((r) => r.status === "NEEDS_WORK");
+
+  if (reviewers.length === 0) {
+    return { status: "NO_REVIEWERS", reviewed: false, approved: false, approvals };
+  }
+  if (needsWork) {
+    return { status: "NEEDS_WORK", reviewed: true, approved: false, approvals };
+  }
+  if (approvals > 0) {
+    return { status: "APPROVED", reviewed: true, approved: true, approvals };
+  }
+  return { status: "NOT_REVIEWED", reviewed: false, approved: false, approvals };
+}
+
+export async function getPrReviewStatus(
+  client: BitbucketClient,
+  project: string,
+  repo: string,
+  prId: number,
+): Promise<ReviewStatusResult> {
+  const pr = await client.get<PullRequestDetails>(
+    `/rest/api/1.0/projects/${project}/repos/${repo}/pull-requests/${prId}`,
+  );
+
+  const reviewers = (pr.reviewers ?? []).map((r) => ({
+    name: r.user.name,
+    displayName: r.user.displayName ?? r.user.name,
+    status: r.status,
+  }));
+
+  return {
+    prId: pr.id,
+    title: pr.title,
+    state: pr.state,
+    draft: pr.draft ?? false,
+    url: pr.links?.self?.[0]?.href ?? null,
+    reviewers,
+    ...summarizeReviewStatus(reviewers),
+  };
+}
