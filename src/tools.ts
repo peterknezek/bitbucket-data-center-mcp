@@ -8,8 +8,10 @@ import {
   getDefaultBranch,
   createPr,
   replyToPrComment,
+  getPrReviewStatus,
   type CommentResult,
   type ReplyResult,
+  type ReviewStatusResult,
 } from "./resources.js";
 
 function formatReplies(replies: ReplyResult[], depth: number): string {
@@ -50,6 +52,37 @@ function formatComments(comments: CommentResult[], repoPath: string | undefined)
     `\nAvailable comment IDs: ${ids}`;
 
   return formatted + suggestion;
+}
+
+function formatReviewStatus(result: ReviewStatusResult): string {
+  const total = result.reviewers.length;
+  const summary = {
+    NO_REVIEWERS: "Not reviewed — no reviewers are assigned.",
+    NOT_REVIEWED: `Not reviewed — none of the ${total} reviewer(s) has approved or requested changes yet.`,
+    NEEDS_WORK: `Reviewed, not approved — changes requested (${result.approvals} of ${total} reviewer(s) approved).`,
+    APPROVED: `Reviewed and approved — ${result.approvals} of ${total} reviewer(s) approved.`,
+  }[result.status];
+
+  const lines = [
+    `PR #${result.prId}: ${result.title}`,
+    `State: ${result.state}${result.draft ? " (draft)" : ""}`,
+    `Review status: ${result.status}`,
+    `Reviewed: ${result.reviewed ? "yes" : "no"}`,
+    `Approved: ${result.approved ? "yes" : "no"}`,
+    ``,
+    summary,
+  ];
+
+  if (total > 0) {
+    lines.push(``, `Reviewers:`);
+    for (const r of result.reviewers) {
+      lines.push(`- ${r.displayName} (${r.name}): ${r.status}`);
+    }
+  }
+
+  if (result.url) lines.push(``, result.url);
+
+  return lines.join("\n");
 }
 
 function git(cmd: string, cwd: string): string {
@@ -287,6 +320,75 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
       lines.push(``, prUrl);
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
+    },
+  );
+
+  server.registerTool(
+    "get_pr_review_status",
+    {
+      title: "Get PR Review Status",
+      description:
+        "Checks whether a pull request has been reviewed and, if so, whether it was approved or changes were requested. " +
+        "Determined from reviewer statuses in the Bitbucket API — no analysis needed; present the result as returned. " +
+        "Pass prId to check a specific PR, otherwise the open PR for the current branch is used. " +
+        "Pass repoPath (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.",
+      inputSchema: z.object({
+        prId: z
+          .number()
+          .optional()
+          .describe("Pull request ID. If omitted, the open pull request for the branch is used."),
+        repoPath: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to the local repository root (from `git rev-parse --show-toplevel`). " +
+              "Auto-detects project, repo, and branch via git.",
+          ),
+        project: z
+          .string()
+          .optional()
+          .describe("Bitbucket project key. Inferred from git remote when repoPath is provided."),
+        repo: z
+          .string()
+          .optional()
+          .describe("Bitbucket repository slug. Inferred from git remote when repoPath is provided."),
+        branch: z
+          .string()
+          .optional()
+          .describe("Source branch. Inferred from git when repoPath is provided. Ignored when prId is given."),
+      }),
+    },
+    async ({ prId, repoPath, project, repo, branch }) => {
+      let resolvedProject = project;
+      let resolvedRepo = repo;
+      let resolvedBranch = branch;
+
+      if (repoPath && (!resolvedProject || !resolvedRepo || (prId == null && !resolvedBranch))) {
+        const remoteUrl = git("git remote get-url origin", repoPath);
+        const parsed = parseRemoteUrl(remoteUrl);
+        if (!parsed) {
+          throw new Error(`Could not parse git remote URL: ${remoteUrl}`);
+        }
+        resolvedProject = resolvedProject ?? parsed.project;
+        resolvedRepo = resolvedRepo ?? parsed.repo;
+        if (prId == null) {
+          resolvedBranch = resolvedBranch ?? git("git branch --show-current", repoPath);
+        }
+      }
+
+      if (!resolvedProject || !resolvedRepo || (prId == null && !resolvedBranch)) {
+        throw new Error(
+          "Provide repoPath (from `git rev-parse --show-toplevel`) or pass project and repo together with prId or branch.",
+        );
+      }
+
+      const resolvedPrId =
+        prId ?? (await findOpenPrForBranch(client, resolvedProject, resolvedRepo, resolvedBranch!));
+      const result = await getPrReviewStatus(client, resolvedProject, resolvedRepo, resolvedPrId);
+
+      return {
+        content: [{ type: "text", text: formatReviewStatus(result) }],
+      };
     },
   );
 

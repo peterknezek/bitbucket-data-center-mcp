@@ -14,7 +14,7 @@
   },
   "scripts": {
     "dev": "tsx src/index.ts",
-    "test": "vitest",
+    "test": "vitest --dir src",
     "typecheck": "tsc",
     "inspect": "mcp-inspector"
   },
