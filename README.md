@@ -30,6 +30,7 @@ pnpm install
 | `get_pr_comments`     | Fetches all unresolved inline review comments for the open PR on the current branch, including full reply threads rendered as nested trees. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor.                                      |
 | `create_pull_request` | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers and draft status. |
 | `reply_to_pr_comment` | Posts a reply to a specific pull request comment by its ID. Use the comment IDs returned by `get_pr_comments`. Useful for acknowledging a review comment or explaining what fix was applied. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.                                      |
+| `update_pull_request` | Replaces the description (and optionally the title) of an open pull request, typically after new commits were pushed. Saves immediately; reviewers, target branch and draft status are left unchanged, and the previous description is returned. Pass `repoPath` to auto-detect project, repo, and branch.                  |
 
 ## Available Prompts
 
@@ -38,6 +39,7 @@ pnpm install
 | `review-pr-comments`  | Fetches and displays all unresolved PR review comments as formatted, navigable links                                                                                                      |
 | `create-pull-request` | Analyzes the current branch, drafts a PR title and short description following branch naming conventions, confirms with the user, then creates the pull request on Bitbucket Data Center. |
 | `rebase-onto-main`    | Detects the default branch (main or master), fetches the latest changes, rebases the current branch onto it, resolves any conflicts, and force-pushes.                                    |
+| `update-pr-description` | After new commits were pushed, rewrites the PR description to match the branch's current changes, confirms the draft with the user, then saves it.                                       |
 
 ## Connecting to an MCP Client
 

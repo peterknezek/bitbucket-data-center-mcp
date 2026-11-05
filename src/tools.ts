@@ -11,6 +11,11 @@ import {
   type CommentResult,
   type ReplyResult,
 } from "./resources.js";
+import { getEditablePr, updatePrText } from "./pullRequestUpdate.js";
+
+function quoteBlock(text: string): string {
+  return text ? text.split("\n").map((l) => `> ${l}`).join("\n") : "> (empty)";
+}
 
 function formatReplies(replies: ReplyResult[], depth: number): string {
   return replies
@@ -353,6 +358,97 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           },
         ],
       };
+    },
+  );
+
+  server.registerTool(
+    "update_pull_request",
+    {
+      title: "Update Pull Request",
+      description:
+        "Replaces the description (and optionally the title) of an open pull request on Bitbucket Data Center. " +
+        "Use it after new commits were pushed to the PR's branch, to bring the description in line with the changes. " +
+        "Call it only once the new text is decided and the user has agreed to it: the change is saved immediately. " +
+        "Reviewers, target branch and draft status are kept as they are. " +
+        "The previous description is returned so it can be restored if needed. " +
+        "Pass prId to edit a specific PR, otherwise the open PR for the current branch is used. " +
+        "Pass repoPath (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.",
+      inputSchema: z.object({
+        description: z.string().describe("The complete new PR description (Markdown). Replaces the current one."),
+        title: z.string().optional().describe("New PR title. Omit to keep the current title."),
+        prId: z
+          .number()
+          .optional()
+          .describe("Pull request ID. If omitted, the open pull request for the branch is used."),
+        repoPath: z
+          .string()
+          .optional()
+          .describe(
+            "Absolute path to the local repository root (from `git rev-parse --show-toplevel`). " +
+              "Auto-detects project, repo, and branch via git.",
+          ),
+        project: z
+          .string()
+          .optional()
+          .describe("Bitbucket project key. Inferred from git remote when repoPath is provided."),
+        repo: z
+          .string()
+          .optional()
+          .describe("Bitbucket repository slug. Inferred from git remote when repoPath is provided."),
+        branch: z
+          .string()
+          .optional()
+          .describe("Source branch. Inferred from git when repoPath is provided. Ignored when prId is given."),
+      }),
+      annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ description, title, prId, repoPath, project, repo, branch }) => {
+      let resolvedProject = project;
+      let resolvedRepo = repo;
+      let resolvedBranch = branch;
+
+      if (repoPath && (!resolvedProject || !resolvedRepo || (prId == null && !resolvedBranch))) {
+        const remoteUrl = git("git remote get-url origin", repoPath);
+        const parsed = parseRemoteUrl(remoteUrl);
+        if (!parsed) {
+          throw new Error(`Could not parse git remote URL: ${remoteUrl}`);
+        }
+        resolvedProject = resolvedProject ?? parsed.project;
+        resolvedRepo = resolvedRepo ?? parsed.repo;
+        if (prId == null) {
+          resolvedBranch = resolvedBranch ?? git("git branch --show-current", repoPath);
+        }
+      }
+
+      if (!resolvedProject || !resolvedRepo || (prId == null && !resolvedBranch)) {
+        throw new Error(
+          "Provide repoPath (from `git rev-parse --show-toplevel`) or pass project and repo together with prId or branch.",
+        );
+      }
+
+      const resolvedPrId =
+        prId ?? (await findOpenPrForBranch(client, resolvedProject, resolvedRepo, resolvedBranch!));
+      const pr = await getEditablePr(client, resolvedProject, resolvedRepo, resolvedPrId);
+
+      if (pr.state !== "OPEN") {
+        throw new Error(`Pull request #${pr.id} is ${pr.state}; only open pull requests can be edited.`);
+      }
+      const newTitle = title?.trim() ? title : pr.title;
+      const previousDescription = pr.description ?? "";
+
+      const updated = await updatePrText(client, resolvedProject, resolvedRepo, pr, {
+        title: newTitle,
+        description,
+      });
+
+      const lines = [`Pull request updated.`, `PR #${updated.id}: ${updated.title}`];
+      if (newTitle !== pr.title) lines.push(`Previous title: ${pr.title}`);
+      lines.push(``, `Description:`, quoteBlock(updated.description ?? ""));
+      lines.push(``, `Previous description:`, quoteBlock(previousDescription));
+      const url = updated.links?.self?.[0]?.href;
+      if (url) lines.push(``, url);
+
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     },
   );
 }

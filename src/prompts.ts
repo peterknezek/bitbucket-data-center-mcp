@@ -82,4 +82,34 @@ Follow these steps exactly:
       ],
     }),
   );
+
+  server.registerPrompt(
+    "update-pr-description",
+    {
+      title: "Update PR Description",
+      description:
+        "After new commits were pushed to the PR's branch, rewrites the PR description to match the branch's current changes, confirms with the user, then saves it on Bitbucket Data Center.",
+    },
+    async () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: `You are helping a developer update the description of their pull request after they pushed new commits to it. Your ONLY job is to draft the new description and call the update_pull_request tool. Do NOT modify any files, do NOT implement any changes, do NOT suggest code fixes.
+
+Follow these steps exactly:
+
+1. Run \`git rev-parse --show-toplevel\` to get the repo path.
+2. Run \`git status -sb\` to check the branch is pushed. If it is ahead of its upstream, show the user \`git push\` and ask for confirmation before running it. Do NOT push without confirmation.
+3. Run \`git log origin/HEAD..HEAD --oneline\` and \`git diff origin/HEAD..HEAD --stat\` to see everything the branch changes, including the new commits.
+4. Draft the description: 3–5 brief bullet points covering the whole branch as it is now (what changed, not how).
+5. Show the draft to the user and ask: "Update the PR description to this?"
+6. Once confirmed, call \`update_pull_request\` with \`repoPath\` and \`description\`.
+7. Stop. Do NOT do anything else after the description is updated.`,
+          },
+        },
+      ],
+    }),
+  );
 }
