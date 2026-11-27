@@ -12,6 +12,15 @@ import {
   type ReplyResult,
 } from "./resources.js";
 import { getEditablePr, updatePrText } from "./pullRequestUpdate.js";
+import { uploadAttachments, withAttachments } from "./attachments.js";
+
+const attachmentsSchema = z
+  .array(z.string())
+  .optional()
+  .describe(
+    "Absolute paths to local image files (png, jpg, gif, webp, svg) such as screenshots. " +
+      "Each is uploaded to the repository and added to the end of the description under a \"Screenshots\" heading.",
+  );
 
 function quoteBlock(text: string): string {
   return text ? text.split("\n").map((l) => `> ${l}`).join("\n") : "> (empty)";
@@ -165,8 +174,8 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         "4. Run `git log origin/HEAD..HEAD --oneline` and `git diff origin/HEAD..HEAD --stat` to understand what changed.\n" +
         "5. Draft title as `<type>(<taskId>): <brief description>` (imperative, lowercase, no period) " +
         "and a description of 3–5 brief bullet points (what changed, not how).\n" +
-        "6. Show the draft to the user and ask for confirmation and whether to add reviewers.\n" +
-        "7. Call this tool with repoPath, title, description, and reviewers.\n" +
+        "6. Show the draft to the user and ask for confirmation, whether to add reviewers, and whether to attach any screenshots.\n" +
+        "7. Call this tool with repoPath, title, description, reviewers, and attachments (absolute image paths) if any.\n" +
         "8. If the tool reports that the branch has not been pushed, show the suggested git push command to the user and ask for confirmation before running it. Do NOT push without confirmation.\n" +
         "9. Stop after the PR is created. Do NOT do anything else.",
       inputSchema: z.object({
@@ -203,9 +212,10 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           .describe("Target branch (toRef). Defaults to the repository's default branch."),
         reviewers: z.array(z.string()).optional().describe("List of Bitbucket usernames to add as reviewers."),
         draft: z.boolean().optional().describe("Create as a draft pull request. Defaults to false."),
+        attachments: attachmentsSchema,
       }),
     },
-    async ({ repoPath, project, repo, branch, title, taskId, description, targetBranch, reviewers, draft }) => {
+    async ({ repoPath, project, repo, branch, title, taskId, description, targetBranch, reviewers, draft, attachments }) => {
       let resolvedProject = project;
       let resolvedRepo = repo;
       let resolvedBranch = branch;
@@ -271,9 +281,11 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         }
       }
 
+      const uploaded = await uploadAttachments(client, resolvedProject, resolvedRepo, attachments ?? []);
+
       const pr = await createPr(client, resolvedProject, resolvedRepo, {
         title: resolvedTitle,
-        description,
+        description: uploaded.length ? withAttachments(description, uploaded) : description,
         fromBranch: resolvedBranch,
         toBranch: resolvedTarget,
         reviewers,
@@ -289,6 +301,7 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         `From: ${resolvedBranch} → ${resolvedTarget}`,
       ];
       if (draft) lines.push("Status: Draft");
+      if (uploaded.length) lines.push(`Screenshots: ${uploaded.map((a) => a.fileName).join(", ")}`);
       lines.push(``, prUrl);
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
@@ -371,6 +384,7 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         "Call it only once the new text is decided and the user has agreed to it: the change is saved immediately. " +
         "Reviewers, target branch and draft status are kept as they are. " +
         "The previous description is returned so it can be restored if needed. " +
+        "Pass attachments (absolute image paths) to upload screenshots and add them to the end of the new description. " +
         "Pass prId to edit a specific PR, otherwise the open PR for the current branch is used. " +
         "Pass repoPath (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.",
       inputSchema: z.object({
@@ -399,10 +413,11 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           .string()
           .optional()
           .describe("Source branch. Inferred from git when repoPath is provided. Ignored when prId is given."),
+        attachments: attachmentsSchema,
       }),
       annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    async ({ description, title, prId, repoPath, project, repo, branch }) => {
+    async ({ description, title, prId, repoPath, project, repo, branch, attachments }) => {
       let resolvedProject = project;
       let resolvedRepo = repo;
       let resolvedBranch = branch;
@@ -436,9 +451,11 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
       const newTitle = title?.trim() ? title : pr.title;
       const previousDescription = pr.description ?? "";
 
+      const uploaded = await uploadAttachments(client, resolvedProject, resolvedRepo, attachments ?? []);
+
       const updated = await updatePrText(client, resolvedProject, resolvedRepo, pr, {
         title: newTitle,
-        description,
+        description: withAttachments(description, uploaded),
       });
 
       const lines = [`Pull request updated.`, `PR #${updated.id}: ${updated.title}`];

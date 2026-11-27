@@ -28,9 +28,9 @@ pnpm install
 | Name                  | Description                                                                                                                                                                                                                                                                                                                        |
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `get_pr_comments`     | Fetches all unresolved inline review comments for the open PR on the current branch, including full reply threads rendered as nested trees. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch via git and enable clickable file links in Cursor.                                      |
-| `create_pull_request` | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers and draft status. |
+| `create_pull_request` | Creates a pull request on Bitbucket Data Center. Auto-detects project, repo, and branch from `repoPath`. Auto-generates a PR title from branch naming convention (`<type>/<taskId>_<description>`), resolves the default target branch, validates that the branch has been pushed, and optionally adds reviewers, draft status, and screenshots (`attachments`). |
 | `reply_to_pr_comment` | Posts a reply to a specific pull request comment by its ID. Use the comment IDs returned by `get_pr_comments`. Useful for acknowledging a review comment or explaining what fix was applied. Pass `repoPath` (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.                                      |
-| `update_pull_request` | Replaces the description (and optionally the title) of an open pull request, typically after new commits were pushed. Saves immediately; reviewers, target branch and draft status are left unchanged, and the previous description is returned. Pass `repoPath` to auto-detect project, repo, and branch.                  |
+| `update_pull_request` | Replaces the description (and optionally the title) of an open pull request, typically after new commits were pushed. Saves immediately; reviewers, target branch and draft status are left unchanged, and the previous description is returned. Pass `repoPath` to auto-detect project, repo, and branch. Pass `attachments` to add screenshots. |
 
 ## Available Prompts
 
@@ -130,3 +130,9 @@ npx @modelcontextprotocol/inspector tsx src/index.ts
 ```
 
 **Environment variables:** Set `BITBUCKET_URL` and `BITBUCKET_TOKEN` in the **Environment Variables** section of the inspector UI before clicking Connect.
+
+## Screenshots in PR descriptions
+
+`create_pull_request` and `update_pull_request` accept `attachments`: absolute paths to local images (png, jpg, gif, webp, svg). Each image is uploaded to the repository and appended to the description under a `### Screenshots` heading as `![file.png](attachment:<repoId>/<attachmentId>)`, the same Markdown the Bitbucket web UI writes when an image is pasted.
+
+Bitbucket Data Center has no documented REST endpoint for uploading attachments, so this uses the web UI's own endpoint (`POST /projects/{key}/repos/{slug}/attachments`, multipart field `file`). It has been tested against a real Bitbucket Data Center instance, but Atlassian may change it in a future version. Deleting an uploaded attachment needs repository admin rights.
