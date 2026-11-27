@@ -79,6 +79,35 @@ export class BitbucketClient {
     return res.json() as Promise<T>;
   }
 
+  /**
+   * POST a multipart form. Bitbucket rejects multipart requests without `X-Atlassian-Token: no-check`
+   * (XSRF protection), so it is always sent.
+   */
+  async postForm<T = unknown>(path: string, form: FormData): Promise<T> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    const res = await fetch(url.toString(), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        Accept: "application/json",
+        "X-Atlassian-Token": "no-check",
+      },
+      body: form,
+    });
+    if (!res.ok) {
+      let errBody = "";
+      try {
+        errBody = await res.text();
+      } catch {
+        /* ignore */
+      }
+      throw new Error(
+        `Bitbucket API error: HTTP ${res.status} for POST ${url.toString()}${errBody ? ` — ${errBody}` : ""}`,
+      );
+    }
+    return res.json() as Promise<T>;
+  }
+
   async paginate<T = unknown>(path: string, params?: Record<string, string>): Promise<T[]> {
     const results: T[] = [];
     let start = 0;

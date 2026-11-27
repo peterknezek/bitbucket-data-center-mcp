@@ -74,8 +74,8 @@ Follow these steps exactly:
 6. Draft:
    - **Title**: \`<type>(<taskId>): <brief description>\` — imperative mood, lowercase, no period
    - **Description**: 3–5 bullet points max, each one brief (what changed, not how)
-7. Show the draft to the user and ask: "Does this look good? Any changes or reviewers to add?"
-8. Once confirmed, call \`create_pull_request\` with \`repoPath\`, \`title\`, \`description\`, and \`reviewers\` (if any were specified).
+7. Show the draft to the user and ask: "Does this look good? Any changes, reviewers or screenshots to add?"
+8. Once confirmed, call \`create_pull_request\` with \`repoPath\`, \`title\`, \`description\`, \`reviewers\` (if any were specified), and \`attachments\` (absolute paths of any screenshots the user gave).
 9. Stop. Do NOT do anything else after the pull request is created.`,
           },
         },
