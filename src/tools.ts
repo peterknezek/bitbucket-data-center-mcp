@@ -14,14 +14,20 @@ import {
   type ReviewStatusResult,
 } from "./resources.js";
 import { getEditablePr, updatePrText } from "./pullRequestUpdate.js";
-import { uploadAttachments, withAttachments } from "./attachments.js";
+import { applyAttachments, formatUploaded, uploadAttachments, validateAttachments } from "./attachments.js";
 
 const attachmentsSchema = z
   .array(z.string())
   .optional()
   .describe(
-    "Absolute paths to local image files (png, jpg, gif, webp, svg) such as screenshots. " +
-      "Each is uploaded to the repository and added to the end of the description under a \"Screenshots\" heading.",
+    "Absolute paths to local image files (png, jpg, gif, webp, svg) such as screenshots. Each file is uploaded once. " +
+      "To choose where an image appears, put `{{attachment:<fileName>}}` in the description, where <fileName> is the file's " +
+      "base name with extension (exact, case-sensitive). Each placeholder is replaced with the bare reference " +
+      "`attachment:<repoId>/<attachmentId>`, so write the image syntax around it, e.g. " +
+      "`![Calculator, mobile, before]({{attachment:calculator-mobile-before.png}})`, also inside Markdown table cells. " +
+      "A placeholder may be used more than once. " +
+      "Files that no placeholder refers to are added to the end of the description under a \"### Screenshots\" heading. " +
+      "Base names must be unique, and every placeholder must match a file, otherwise nothing is uploaded or saved.",
   );
 
 function quoteBlock(text: string): string {
@@ -206,9 +212,12 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         "If the branch does not match, ask the user for the Jira task ID before proceeding.\n" +
         "4. Run `git log origin/HEAD..HEAD --oneline` and `git diff origin/HEAD..HEAD --stat` to understand what changed.\n" +
         "5. Draft title as `<type>(<taskId>): <brief description>` (imperative, lowercase, no period) " +
-        "and a description of 3–5 brief bullet points (what changed, not how).\n" +
+        "and a description of 3–5 brief bullet points (what changed, not how). " +
+        "When screenshots are attached, the bullets may be followed by a screenshots section (for example a Before/After table) " +
+        "that places each image with a `{{attachment:<fileName>}}` placeholder.\n" +
         "6. Show the draft to the user and ask for confirmation, whether to add reviewers, and whether to attach any screenshots.\n" +
-        "7. Call this tool with repoPath, title, description, reviewers, and attachments (absolute image paths) if any.\n" +
+        "7. Call this tool with repoPath, title, description, reviewers, and attachments (absolute image paths) if any. " +
+        "The result lists each uploaded file as `fileName -> attachment:<repoId>/<attachmentId>`.\n" +
         "8. If the tool reports that the branch has not been pushed, show the suggested git push command to the user and ask for confirmation before running it. Do NOT push without confirmation.\n" +
         "9. Stop after the PR is created. Do NOT do anything else.",
       inputSchema: z.object({
@@ -238,7 +247,14 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           .describe(
             "Jira task ID (e.g. CDC-123). Required when branch name does not follow the convention and title is not provided.",
           ),
-        description: z.string().optional().describe("Short bullet-point description of what changed."),
+        description: z
+          .string()
+          .optional()
+          .describe(
+            "Short bullet-point description of what changed (Markdown), optionally followed by a screenshots section. " +
+              "Use `{{attachment:<fileName>}}` placeholders to place uploaded images, e.g. " +
+              "`![Login, before]({{attachment:login-before.png}})`; see attachments.",
+          ),
         targetBranch: z
           .string()
           .optional()
@@ -269,6 +285,8 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
           "Provide repoPath (from `git rev-parse --show-toplevel`) or pass project, repo, and branch explicitly.",
         );
       }
+
+      await validateAttachments(description, attachments ?? []);
 
       if (repoPath) {
         const remoteRef = git(`git ls-remote --heads origin refs/heads/${resolvedBranch}`, repoPath);
@@ -318,7 +336,7 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
 
       const pr = await createPr(client, resolvedProject, resolvedRepo, {
         title: resolvedTitle,
-        description: uploaded.length ? withAttachments(description, uploaded) : description,
+        description: applyAttachments(description, uploaded),
         fromBranch: resolvedBranch,
         toBranch: resolvedTarget,
         reviewers,
@@ -334,7 +352,7 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         `From: ${resolvedBranch} → ${resolvedTarget}`,
       ];
       if (draft) lines.push("Status: Draft");
-      if (uploaded.length) lines.push(`Screenshots: ${uploaded.map((a) => a.fileName).join(", ")}`);
+      lines.push(...formatUploaded(uploaded));
       lines.push(``, prUrl);
 
       return { content: [{ type: "text", text: lines.join("\n") }] };
@@ -486,11 +504,22 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         "Call it only once the new text is decided and the user has agreed to it: the change is saved immediately. " +
         "Reviewers, target branch and draft status are kept as they are. " +
         "The previous description is returned so it can be restored if needed. " +
-        "Pass attachments (absolute image paths) to upload screenshots and add them to the end of the new description. " +
+        "Pass attachments (absolute image paths) to upload screenshots; place them with `{{attachment:<fileName>}}` placeholders " +
+        "in the description, or let them be added to the end under a \"### Screenshots\" heading. " +
+        "The result lists each uploaded file as `fileName -> attachment:<repoId>/<attachmentId>`; " +
+        "reuse those references in later edits instead of uploading the files again. " +
         "Pass prId to edit a specific PR, otherwise the open PR for the current branch is used. " +
         "Pass repoPath (from `git rev-parse --show-toplevel`) to auto-detect project, repo, and branch.",
       inputSchema: z.object({
-        description: z.string().describe("The complete new PR description (Markdown). Replaces the current one."),
+        description: z
+          .string()
+          .describe(
+            "The complete new PR description (Markdown). Replaces the current one. " +
+              "Use `{{attachment:<fileName>}}` placeholders to place uploaded images, e.g. " +
+              "`![Login, after]({{attachment:login-after.png}})`; see attachments. " +
+              "Existing `attachment:<repoId>/<attachmentId>` references are kept as they are, so images already in the " +
+              "description stay visible as long as their Markdown is kept.",
+          ),
         title: z.string().optional().describe("New PR title. Omit to keep the current title."),
         prId: z
           .number()
@@ -543,6 +572,8 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
         );
       }
 
+      await validateAttachments(description, attachments ?? []);
+
       const resolvedPrId =
         prId ?? (await findOpenPrForBranch(client, resolvedProject, resolvedRepo, resolvedBranch!));
       const pr = await getEditablePr(client, resolvedProject, resolvedRepo, resolvedPrId);
@@ -557,13 +588,14 @@ export function registerTools(server: McpServer, client: BitbucketClient) {
 
       const updated = await updatePrText(client, resolvedProject, resolvedRepo, pr, {
         title: newTitle,
-        description: withAttachments(description, uploaded),
+        description: applyAttachments(description, uploaded) ?? "",
       });
 
       const lines = [`Pull request updated.`, `PR #${updated.id}: ${updated.title}`];
       if (newTitle !== pr.title) lines.push(`Previous title: ${pr.title}`);
       lines.push(``, `Description:`, quoteBlock(updated.description ?? ""));
       lines.push(``, `Previous description:`, quoteBlock(previousDescription));
+      lines.push(...formatUploaded(uploaded));
       const url = updated.links?.self?.[0]?.href;
       if (url) lines.push(``, url);
 

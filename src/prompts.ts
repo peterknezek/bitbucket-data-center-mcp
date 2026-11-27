@@ -73,7 +73,7 @@ Follow these steps exactly:
 5. Run \`git diff origin/HEAD..HEAD --stat\` to understand what files changed.
 6. Draft:
    - **Title**: \`<type>(<taskId>): <brief description>\` — imperative mood, lowercase, no period
-   - **Description**: 3–5 bullet points max, each one brief (what changed, not how)
+   - **Description**: 3–5 bullet points max, each one brief (what changed, not how). If the user gives screenshots, the bullets may be followed by a screenshots section that places each image with a \`{{attachment:<fileName>}}\` placeholder, where \`<fileName>\` is the image's base name, for example a Before/After table with \`![Login, before]({{attachment:login-before.png}})\` in its cells. Screenshots without a placeholder are added under a "### Screenshots" heading at the end.
 7. Show the draft to the user and ask: "Does this look good? Any changes, reviewers or screenshots to add?"
 8. Once confirmed, call \`create_pull_request\` with \`repoPath\`, \`title\`, \`description\`, \`reviewers\` (if any were specified), and \`attachments\` (absolute paths of any screenshots the user gave).
 9. Stop. Do NOT do anything else after the pull request is created.`,
@@ -103,7 +103,7 @@ Follow these steps exactly:
 1. Run \`git rev-parse --show-toplevel\` to get the repo path.
 2. Run \`git status -sb\` to check the branch is pushed. If it is ahead of its upstream, show the user \`git push\` and ask for confirmation before running it. Do NOT push without confirmation.
 3. Run \`git log origin/HEAD..HEAD --oneline\` and \`git diff origin/HEAD..HEAD --stat\` to see everything the branch changes, including the new commits.
-4. Draft the description: 3–5 brief bullet points covering the whole branch as it is now (what changed, not how).
+4. Draft the description: 3–5 brief bullet points covering the whole branch as it is now (what changed, not how), optionally followed by a screenshots section. Keep any existing \`![...](attachment:<repoId>/<attachmentId>)\` images unchanged so they stay visible.
 5. Show the draft to the user and ask: "Update the PR description to this?"
 6. Once confirmed, call \`update_pull_request\` with \`repoPath\` and \`description\`.
 7. Stop. Do NOT do anything else after the description is updated.`,

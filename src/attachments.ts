@@ -84,6 +84,70 @@ export async function uploadAttachments(
   return uploaded;
 }
 
+/** `{{attachment:<fileName>}}`, where `<fileName>` is the base name of a file in `attachments`. */
+const PLACEHOLDER = /\{\{attachment:([^{}]+)\}\}/g;
+
+const placeholder = (fileName: string) => `{{attachment:${fileName}}}`;
+
+/** Unique placeholder file names in the order they first appear in the description. */
+export function placeholderNames(description: string | undefined): string[] {
+  return [...new Set([...(description ?? "").matchAll(PLACEHOLDER)].map((m) => m[1]))];
+}
+
+/**
+ * Checks the attachments and the description's placeholders before anything is uploaded or saved:
+ * every file must be a readable, supported image, base names must be unique, and every
+ * `{{attachment:<fileName>}}` placeholder must name one of the files (exact, case-sensitive match).
+ */
+export async function validateAttachments(description: string | undefined, filePaths: string[]): Promise<void> {
+  await Promise.all(filePaths.map(readImage));
+
+  const byName = new Map<string, string[]>();
+  for (const filePath of filePaths) {
+    const name = basename(filePath);
+    byName.set(name, [...(byName.get(name) ?? []), filePath]);
+  }
+  const duplicates = [...byName].filter(([, paths]) => paths.length > 1);
+  if (duplicates.length) {
+    throw new Error(
+      "Attachment file names must be unique, so each {{attachment:<fileName>}} placeholder names one file. " +
+        `Duplicates: ${duplicates.map(([name, paths]) => `${name} (${paths.join(", ")})`).join("; ")}.`,
+    );
+  }
+
+  const unmatched = placeholderNames(description).filter((name) => !byName.has(name));
+  if (unmatched.length) {
+    const available = byName.size ? [...byName.keys()].join(", ") : "none";
+    throw new Error(
+      `No file in attachments matches these description placeholders: ${unmatched.map(placeholder).join(", ")}. ` +
+        `Attachment file names: ${available}.`,
+    );
+  }
+}
+
+/**
+ * Replaces every `{{attachment:<fileName>}}` placeholder with that file's `attachment:<repoId>/<id>`
+ * reference, and appends files that no placeholder refers to under a "Screenshots" heading.
+ * Returns `undefined` only when there was no description and nothing was uploaded.
+ */
+export function applyAttachments(
+  description: string | undefined,
+  attachments: UploadedAttachment[],
+): string | undefined {
+  if (attachments.length === 0) return description;
+  let text = description ?? "";
+  const unreferenced: UploadedAttachment[] = [];
+  for (const attachment of attachments) {
+    const token = placeholder(attachment.fileName);
+    if (text.includes(token)) {
+      text = text.split(token).join(attachment.ref);
+    } else {
+      unreferenced.push(attachment);
+    }
+  }
+  return withAttachments(text, unreferenced);
+}
+
 /** Appends the uploaded images to the description as Markdown images under a "Screenshots" heading. */
 export function withAttachments(description: string | undefined, attachments: UploadedAttachment[]): string {
   const text = description ?? "";
@@ -91,4 +155,14 @@ export function withAttachments(description: string | undefined, attachments: Up
   const images = attachments.map((a) => `![${a.fileName.replace(/[[\]]/g, "")}](${a.ref})`).join("\n\n");
   const section = `### Screenshots\n\n${images}`;
   return text.trim() ? `${text.trimEnd()}\n\n${section}` : section;
+}
+
+/** One line per uploaded file, e.g. `- login.png -> attachment:12/7`, for the tool result. */
+export function formatUploaded(attachments: UploadedAttachment[]): string[] {
+  if (attachments.length === 0) return [];
+  return [
+    "",
+    "Uploaded attachments (reuse these references in later edits instead of uploading again):",
+    ...attachments.map((a) => `- ${a.fileName} -> ${a.ref}`),
+  ];
 }

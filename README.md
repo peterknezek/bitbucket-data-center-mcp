@@ -169,6 +169,19 @@ Mode flags (`--web`, `--cli`, `--tui`) must come first. In `--cli` mode, put the
 
 ## Screenshots in PR descriptions
 
-`create_pull_request` and `update_pull_request` accept `attachments`: absolute paths to local images (png, jpg, gif, webp, svg). Each image is uploaded to the repository and appended to the description under a `### Screenshots` heading as `![file.png](attachment:<repoId>/<attachmentId>)`, the same Markdown the Bitbucket web UI writes when an image is pasted.
+`create_pull_request` and `update_pull_request` accept `attachments`: absolute paths to local images (png, jpg, gif, webp, svg). Each image is uploaded to the repository once and referenced as `attachment:<repoId>/<attachmentId>`, the same reference the Bitbucket web UI writes when an image is pasted.
+
+To choose where an image appears, put `{{attachment:<fileName>}}` in the description, where `<fileName>` is the image's base name with extension (exact, case-sensitive match). The placeholder is replaced with the bare reference, so write the image Markdown around it. For example, a Before/After table:
+
+```markdown
+| Before | After |
+| ------ | ----- |
+| ![Calculator, mobile, before]({{attachment:calculator-mobile-before.png}}) | ![Calculator, mobile, after]({{attachment:calculator-mobile-after.png}}) |
+```
+
+- A placeholder can be used more than once; every occurrence is replaced and the file is uploaded once.
+- Images that no placeholder refers to are appended under a `### Screenshots` heading as `![file.png](attachment:<repoId>/<attachmentId>)`. If every image is placed, no such section is added.
+- `attachment:<repoId>/<attachmentId>` references already in the description are left as they are. The tool result lists each uploaded file as `fileName -> attachment:<repoId>/<attachmentId>`, so later edits can reuse the reference without uploading again.
+- Before anything is uploaded or saved, the request fails if a placeholder has no matching file, if two attachments share a base name, or if a file is missing, not an absolute path, or not a supported image.
 
 Bitbucket Data Center has no documented REST endpoint for uploading attachments, so this uses the web UI's own endpoint (`POST /projects/{key}/repos/{slug}/attachments`, multipart field `file`). It has been tested against a real Bitbucket Data Center instance, but Atlassian may change it in a future version. Deleting an uploaded attachment needs repository admin rights.
